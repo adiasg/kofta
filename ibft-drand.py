@@ -26,10 +26,11 @@ class ConsensusDrand(Consensus):
         if response.status_code != 200:
             print("Failed to GET", url, ", reponse status code:", response.status_code)
         response_json = response.json()
-        print(datetime.datetime.now().time(), "Proposing message for round", round, "using drand randomness:", response_json['randomness'])
         data = response_json['randomness']
         sender = self.node_identity
-        return ConsensusMessage("PRE_PREPARE", round, data, sender)
+        proposal = ConsensusMessage("PRE_PREPARE", round, data, sender)
+        print(datetime.datetime.now().time(), "Proposing message:", proposal)
+        return proposal
 
     def validate_message_data(self, message):
         # NOTE: Verify `message.data` according to application-specific logic by checking against local state
@@ -38,7 +39,7 @@ class ConsensusDrand(Consensus):
         if response.status_code != 200:
             print("Failed to GET", url, ", reponse status code:", response.status_code)
         response_json = response.json()
-        print(datetime.datetime.now().time(), "Validating message from round", message.round, "against drand randomness:", response_json['randomness'])
+        print(datetime.datetime.now().time(), "Validating message: ", message, " against drand randomness:", response_json['randomness'])
         return message.data == response_json['randomness']
 
 parser.add_argument(

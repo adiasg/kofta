@@ -36,6 +36,10 @@ class ConsensusMessage:
     def to_string(self):
         return json.dumps(self.to_dict())
 
+    def __str__(self):
+        # Useful for printing the object directly
+        return self.to_string()
+
     @classmethod
     def from_dict(self, d):
         # TODO: Validate the dict `d`
