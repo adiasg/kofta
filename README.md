@@ -6,14 +6,12 @@ This implementation is based on [the Istanbul BFT Consensus Algorithm](https://a
 
 ## Requirements
 - Python3
+  - Run `make deps` to install all the required Python packages
 - RabbitMQ Server
   - Installing on Ubuntu:
     ```bash
       sudo apt-get install rabbitmq-server
     ```
-
-## Installation
-Run `make install` in the root directory of this repository.
 
 ## Examples
 
