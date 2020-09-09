@@ -29,7 +29,7 @@ Run `make install` in the root directory of this repository.
 
 
 - **drand consensus**
-  - The IBFT protocol will form consensus over drand randomness for a given drand round number.
+  - The IBFT protocol will form consensus over drand randomness for a given drand round number
   - To launch a 4-node testnet, run `./start_drand_network.sh ROUND_DURATION DRAND_ROUND`, where:
     - `ROUND_DURATION` is the duration (in seconds) of the IBFT protocol round
     - `DRAND_ROUND` is the drand round number on whose output consensus will be formed
@@ -39,3 +39,10 @@ Run `make install` in the root directory of this repository.
     - (Protocol Labs) https://api2.drand.sh
     - (Protocol Labs) https://api3.drand.sh
   - Learn more about **drand** at https://drand.love/
+
+
+- **Lighthouse Eth2 data consensus**
+  - The IBFT protocol will form consensus over Eth2 data fetched from a Lighthouse client
+  - To launch a testnet, run `./start_network.sh NUM_NODES ROUND_DURATION BYZ_QUORUM RC_THRESHOLD LIGHTHOUSE_API ETH2_SLOT`, where:
+    - `LIGHTHOUSE_API` is the Ligthouse HTTP endpoint for fetching data
+    - `ETH2_SLOT` is the Eth2 slot for which consensus will be formed on the corresponding block in the fork choice of the Lighthouse client
