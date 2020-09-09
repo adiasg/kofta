@@ -363,21 +363,29 @@ class Consensus:
     def process_message(self, message):
         """
         Returns:
-            - "MESSAGE_REJECTED" if the message was not processed
+            - "MESSAGE_REJECTED" if the message was not added to the store
+            - "NOT_NEW_MESSAGE" if the message has already been seen before
+            - "MSG_NOT_PROCESSED" if the message was added to store, but not processed
+            - "FUTURE_MESSAGE" if the message is from a future round and is not processed right now
             - "NO_CHANGE" for no change to the timer
             - "START_TIMER" for starting/restarting the timer
             - "STOP_TIMER" for stopping the timer
         """
         current_round = self.store.get_round()
         current_state = self.store.get_state()
-        log.info(f'Current round: {current_round}, current state: {current_state}')
+        log.info(f'Processing message in round: {current_round},  state: {current_state}')
         # FIXME: After round change, check if any upon conditions are already satisfied in the store
+
+        if message.type not in ["PRE_PREPARE", "PREPARE", "COMMIT", "ROUND_CHANGE"]:
+            log.error(f'Unknown message type: {message.type}')
+            return "MESSAGE_REJECTED"
 
         if current_state == "DECIDED":
             # TODO: Send the decided value if ROUND_CHANGE message is received
             return "MESSAGE_REJECTED"
 
-        if message.round < current_round:
+        if message.type != "COMMIT" and message.round < current_round:
+            # Process COMMIT messages from any round
             return "MESSAGE_REJECTED"
 
         try:
@@ -388,28 +396,29 @@ class Consensus:
             return "MESSAGE_REJECTED"
 
         if not is_new_message:
-            return "MESSAGE_REJECTED"
+            return "NOT_NEW_MESSAGE"
 
         #-----------------------------------------------------------------------
         if message.type == "PRE_PREPARE":
             if message.round > current_round:
-                return "MESSAGE_REJECTED"
+                return "FUTURE_MESSAGE"
             if current_state not in ["PRE_PREPARED", "ROUND_TIMEOUT", "ROUND_CHANGED"]:
-                return "MESSAGE_REJECTED"
+                return "MSG_NOT_PROCESSED"
             self.store.set_state("PREPARED")
             if self.node_identity is not None:
                 data = {'value': message.data['value']}
                 sender = self.node_identity
                 prepare_message = ConsensusMessage("PREPARE", current_round, data, sender)
                 broadcast_message(prepare_message, self.store.get_peers())
-            log.info(f'State set to PREPARED. PRE_PREPARE was: {message}')
+            log.info(f'State set to PREPARED. Prepared for value: {message.data["value"]}')
+            log.debug(f'PRE_PREPARE was: {message}')
             return "START_TIMER"
         #-----------------------------------------------------------------------
         elif message.type == "PREPARE":
             if message.round > current_round:
-                return "MESSAGE_REJECTED"
+                return "FUTURE_MESSAGE"
             if current_state not in ["PRE_PREPARED", "PREPARED", "ROUND_TIMEOUT", "ROUND_CHANGED"]:
-                return "MESSAGE_REJECTED"
+                return "MSG_NOT_PROCESSED"
             prepare_msgs = self.store.get_messages(current_round, "PREPARE")
             supporting_weights = {}
             for msg in prepare_msgs:
@@ -435,15 +444,15 @@ class Consensus:
                     sender = self.node_identity
                     commit_message = ConsensusMessage("COMMIT", current_round, data, sender)
                     broadcast_message(commit_message, self.store.get_peers())
-                log.info(f'State set to COMITTED. PREPARE_QUORUM was: {[msg.to_string() for msg in quorum_messages]}')
+                log.info(f'State set to COMITTED. Committed to value {best_value}')
+                log.debug(f'PREPARE_QUORUM was: {[msg.to_string() for msg in quorum_messages]}')
             return "NO_CHANGE"
         #-----------------------------------------------------------------------
         elif message.type == "COMMIT":
-            if message.round > current_round:
-                return "MESSAGE_REJECTED"
             if current_state not in ["PRE_PREPARED", "PREPARED", "COMMITTED", "ROUND_TIMEOUT", "ROUND_CHANGED"]:
-                return "MESSAGE_REJECTED"
-            commit_msgs = self.store.get_messages(current_round, "COMMIT")
+                # Process commit messages in any state
+                return "MSG_NOT_PROCESSED"
+            commit_msgs = self.store.get_messages(message.round, "COMMIT")
             supporting_weights = {}
             for msg in commit_msgs:
                 value = msg.data['value']
@@ -460,9 +469,10 @@ class Consensus:
                 for msg in commit_msgs:
                     if msg.data['value'] == best_value:
                         quorum_messages.append(msg)
-                self.store.add_quorum_messages(current_round, "COMMIT_QUORUM", quorum_messages)
+                self.store.add_quorum_messages(message.round, "COMMIT_QUORUM", quorum_messages)
                 self.store.set_state("DECIDED")
-                log.info(f'State set to DECIDED. COMMIT_QUORUM was: {[msg.to_string() for msg in quorum_messages]}')
+                log.info(f'State set to DECIDED. Decided on value: {best_value}')
+                log.debug(f'COMMIT_QUORUM was: {[msg.to_string() for msg in quorum_messages]}')
                 return "STOP_TIMER"
             return "NO_CHANGE"
         #-----------------------------------------------------------------------
@@ -488,16 +498,16 @@ class Consensus:
                     self.broadcast_round_change()
                     log.info(f'State set to ROUND_CHANGED. rc_quorum was: {[msg.to_string() for msg in rc_quorum]}')
                     return "START_TIMER"
-            elif message.round == current_round and self.store.get_leader() == self.node_identity:
+            elif message.round == current_round:
                 rc_quorum = self.store.get_messages(current_round, "ROUND_CHANGE")
                 supporting_weight = sum([self.nodes[rc_msg.sender].weight for rc_msg in rc_quorum])
                 # TODO: Don't access self.store.messages directly
                 if supporting_weight >= self.byz_quorum:
                     highest_pr_rc_message = max(rc_quorum, key=lambda rc_msg: rc_msg.data['prepared_round'])
                     self.store.set_state("PRE_PREPARED")
-                    self.broadcast_proposal(highest_pr_rc_message.data['prepared_value'], rc_quorum)
-                    return "START_TIMER"
+                    if self.store.get_leader() == self.node_identity:
+                        self.broadcast_proposal(highest_pr_rc_message.data['prepared_value'], rc_quorum)
             return "NO_CHANGE"
         #-----------------------------------------------------------------------
         log.error(f'Unknown message type: {message.type}')
-        return "MESSAGE_REJECTED"
+        return "MSG_NOT_PROCESSED"

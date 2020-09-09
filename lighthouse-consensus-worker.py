@@ -6,7 +6,7 @@ import json
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 from consensus import ConsensusNode, ConsensusMessage, ConsensusStore
-from drand_consensus import DrandConsensus
+from lighthouse_consensus import LighthouseConsensus
 import logging
 
 # python3 consensus-worker.py --nodes localhost:9000 --node_identity 0 --byz_quorum 1 --round_duration 3 --start_time $(( $(date '+%s') + 2 ))
@@ -49,16 +49,16 @@ parser.add_argument(
     help = "Start time (as UNIX timestamp) for the protocol"
 )
 parser.add_argument(
-    "--drand_api",
+    "--lighthouse_api",
     type = str,
-    default = 'https://drand.cloudflare.com/public',
-    help = "drand API to fetch drand values"
+    default = 'http://localhost:5052',
+    help = "Lighthouse API to fetch Eth2 data"
 )
 parser.add_argument(
-    "--drand_round",
+    "--eth2_slot",
     type = int,
     default = 1,
-    help = "Forms consensus on the drand value from this round"
+    help = "Forms consensus on the Eth2 block in the fork choice at this slot"
 )
 args = parser.parse_args()
 
@@ -73,7 +73,7 @@ log.addHandler(ch)
 for logger in logging.Logger.manager.loggerDict.values():
     if isinstance(logger, logging.PlaceHolder):
         continue
-    if logger.name in ['consensus', 'drand_consensus']:
+    if logger.name in ['consensus', 'lighthouse_consensus']:
         logger.setLevel(logging.INFO)
         logger.addHandler(ch)
 
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         node_identity = None
 
     store = ConsensusStore(node_identity, peers)
-    consensus_instance = DrandConsensus(nodes, byz_quorum, rc_threshold, round_duration, start_time, store, node_identity=node_identity, drand_api=args.drand_api, drand_round=args.drand_round)
+    consensus_instance = LighthouseConsensus(nodes, byz_quorum, rc_threshold, round_duration, start_time, store, node_identity=node_identity, lighthouse_api=args.lighthouse_api, eth2_slot=args.eth2_slot)
 
     connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
     channel = connection.channel()

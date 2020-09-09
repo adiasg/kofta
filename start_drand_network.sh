@@ -1,6 +1,6 @@
 # $1 is the duration (in seconds) of each phase of the IBFT round
 ROUND_DURATION=$1
-# $2 is the drand API
+# $2 is the drand round number on whose output to form consensus
 DRAND_ROUND=$2
 
 # $NUM_NODES is the number of nodes in the network
@@ -12,20 +12,22 @@ RC_THRESHOLD=2
 
 START_TIME=$(( $(date '+%s') + 5 ))
 
-NODES="localhost:9000"
+PORT_START_ADDR=10000
+NODES="localhost:$PORT_START_ADDR"
 for i in $(seq 1 $(( $NUM_NODES - 1 )))
 do
-  NODES="$NODES,localhost:$(( 9000 + $i ))"
+  NODES="$NODES,localhost:$(( $PORT_START_ADDR + $i ))"
 done
 
+trap "echo 'Interrupted. Killing all IBFT processes.'; pkill -f 'python3 drand-consensus-worker.py|python3 flask-server.py'" INT
 
 NODE_ID=1
 echo python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( 9000 + $NODE_ID ))
+--port $(( $PORT_START_ADDR + $NODE_ID ))
 python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( 9000 + $NODE_ID )) > /dev/null &
+--port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
 echo python3 drand-consensus-worker.py \
   --nodes $NODES \
   --node_identity $NODE_ID \
@@ -48,10 +50,10 @@ python3 drand-consensus-worker.py \
 NODE_ID=2
 echo python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( 9000 + $NODE_ID ))
+--port $(( $PORT_START_ADDR + $NODE_ID ))
 python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( 9000 + $NODE_ID )) > /dev/null &
+--port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
 echo python3 drand-consensus-worker.py \
   --nodes $NODES \
   --node_identity $NODE_ID \
@@ -74,10 +76,10 @@ python3 drand-consensus-worker.py \
 NODE_ID=3
 echo python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( 9000 + $NODE_ID ))
+--port $(( $PORT_START_ADDR + $NODE_ID ))
 python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( 9000 + $NODE_ID )) > /dev/null &
+--port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
 echo python3 drand-consensus-worker.py \
   --nodes $NODES \
   --node_identity $NODE_ID \
@@ -97,16 +99,13 @@ python3 drand-consensus-worker.py \
   --drand_api https://api3.drand.sh/public \
   --drand_round $DRAND_ROUND > /dev/null &
 #---------------------------------------------
-
-trap "echo 'Interrupted. Killing all other IBFT processes.'; pkill -f 'python3 drand-consensus-worker.py|python3 flask-server.py'" INT
-
 NODE_ID=0
 echo python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( 9000 + $NODE_ID ))
+--port $(( $PORT_START_ADDR + $NODE_ID ))
 python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( 9000 + $NODE_ID )) > /dev/null &
+--port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
 echo python3 drand-consensus-worker.py \
   --nodes $NODES \
   --node_identity $NODE_ID \

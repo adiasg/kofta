@@ -57,9 +57,12 @@ formatter = logging.Formatter(f'%(asctime)s - %(name)-9s - %(levelname)8s - Node
 ch.setFormatter(formatter)
 log.addHandler(ch)
 
-consensus_log = logging.getLogger('consensus')
-consensus_log.setLevel(logging.INFO)
-consensus_log.addHandler(ch)
+for logger in logging.Logger.manager.loggerDict.values():
+    if isinstance(logger, logging.PlaceHolder):
+        continue
+    if logger.name in ['consensus', 'drand_consensus']:
+        logger.setLevel(logging.INFO)
+        logger.addHandler(ch)
 
 if __name__ == '__main__':
     peers = args.nodes.split(',')
@@ -105,7 +108,7 @@ if __name__ == '__main__':
         process_msg_result = consensus_instance.process_message(message)
         log.debug(f'process_message() returned {process_msg_result}')
         if process_msg_result == "STOP_TIMER":
-            log.info('This node has successfully DECIDED, stopping timer')
+            log.info('Successfully DECIDED, stopping timer')
             stop_timer()
         elif process_msg_result == "START_TIMER":
             log.info('Starting/Restarting timer')
