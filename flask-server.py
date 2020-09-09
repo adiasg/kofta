@@ -24,6 +24,16 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter(f'%(asctime)s - %(name)s - %(levelname)8s - Node:{args.node_identity} - %(message)s')
+ch.setFormatter(formatter)
+log.addHandler(ch)
+
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+
 node_identity = args.node_identity
 if node_identity < 0:
     node_identity = None
@@ -33,7 +43,7 @@ app = Flask(__name__)
 @app.route('/messages', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        print(datetime.datetime.now().time(), "received message:", request.json)
+        log.debug(f'Received message: {request.json}')
         connection = pika.BlockingConnection(
             pika.ConnectionParameters(host='localhost'))
         channel = connection.channel()
@@ -43,9 +53,6 @@ def login():
         return "POST received"
     elif request.method == 'GET':
         return "Hello from Flask!"
-
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=args.port, use_reloader=False, threaded=True)

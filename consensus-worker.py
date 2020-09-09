@@ -6,6 +6,7 @@ import json
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 from consensus import ConsensusNode, ConsensusMessage, ConsensusStore, Consensus
+import logging
 
 # python3 consensus-worker.py --nodes localhost:9000 --node_identity 0 --byz_quorum 1 --round_duration 3 --start_time $(( $(date '+%s') + 2 ))
 
@@ -46,9 +47,17 @@ parser.add_argument(
     default = math.ceil(datetime.datetime.timestamp(datetime.datetime.now()))+2,
     help = "Start time (as UNIX timestamp) for the protocol"
 )
+args = parser.parse_args()
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter(f'%(asctime)s - %(name)s - %(levelname)8s - Node:{args.node_identity} - %(message)s')
+ch.setFormatter(formatter)
+log.addHandler(ch)
 
 if __name__ == '__main__':
-    args = parser.parse_args()
     peers = args.nodes.split(',')
 
     nodes = {}
@@ -80,35 +89,32 @@ if __name__ == '__main__':
 
     def stop_timer():
         if scheduler.get_job('round_timeout') is None:
-            print("Attempting to stop unstarted timer")
+            log.warn("Attempting to stop unstarted timer")
             return
         scheduler.remove_job('round_timeout')
 
     start_timer(start_time+round_duration)
 
     def callback(ch, method, properties, body):
-        print("---------------------------")
-        print("STARTING NEW JOB")
-        print("---------------------------")
         message = ConsensusMessage.from_dict(json.loads(body))
-        print(datetime.datetime.now(), "Received message:", message)
+        log.info(f'Received message: {message}')
         process_msg_result = consensus_instance.process_message(message)
-        print("process_msg_result:", process_msg_result)
+        log.debug(f'process_message() returned {process_msg_result}')
         if process_msg_result == "STOP_TIMER":
-            print(datetime.datetime.now(), "This node has successfully DECIDED. Stopping timer.")
+            log.info('This node has successfully DECIDED, stopping timer')
             stop_timer()
         elif process_msg_result == "START_TIMER":
-            print(datetime.datetime.now(), "Starting/Restarting timer.")
+            log.info('Starting/Restarting timer')
 
     channel.basic_consume(queue='ibft_node_'+str(node_identity), on_message_callback=callback, auto_ack=True)
 
     try:
-        print("Start time:", start_time)
+        log.info(f'Start time: {start_time}')
         if consensus_instance.node_identity == 0:
-            print("This node is leader. Scheduling proposal job.")
+            log.info('This node is leader, scheduling proposal job')
             scheduler.add_job(func=consensus_instance.broadcast_proposal, id='leader_proposal', trigger="date", run_date=start_time)
-        print('[*] Waiting for messages. To exit press CTRL+C')
+        log.info('Waiting for messages. To exit press CTRL+C')
         channel.start_consuming()
     except KeyboardInterrupt:
-        print('Interrupted')
+        log.info('Interrupted')
         sys.exit(0)

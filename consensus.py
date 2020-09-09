@@ -3,6 +3,9 @@ import httpx
 import datetime
 import math
 import time
+import logging
+
+log = logging.getLogger(__name__)
 
 class ConsensusNode:
     def __init__(self, node_index, weight=1, public_key=""):
@@ -164,12 +167,12 @@ def broadcast_message(msg, peers, timeout=1):
     for peer in peers:
         url = 'http://'+peer+'/messages'
         try:
-            print(datetime.datetime.now(), "POSTing to", 'http://'+peer+'/messages', msg_dict)
+            log.info(f'Sending message to {peer}, message: {msg_dict}')
             response = httpx.post(url, json=msg_dict, timeout=timeout)
             if response.status_code != 200:
-                print("Failed POST to", 'http://'+peer+'/messages', ", reponse status code:", response.status_code)
+                log.warn(f'Failed POST to http://{peer}/messages, response status code: {response.status_code}')
         except httpx.ConnectError as e:
-            print("Failed POST to", 'http://'+peer+'/messages', ", httpx.ConnectError:", e)
+            log.error(f'Failed POST to http://{peer}/messages', exc_info=True)
 
 class Consensus:
     def __init__(self, nodes, byz_quorum, rc_threshold, round_duration, start_time, store, node_identity=None):
@@ -218,7 +221,7 @@ class Consensus:
         broadcast_message(rc_message, self.store.get_peers())
 
     def round_timeout(self):
-        print(datetime.datetime.now(), "Round timeout")
+        log.info('Round timeout')
         current_round = self.store.get_round()
         self.store.set_round(current_round + 1)
         self.store.set_state("ROUND_TIMEOUT")
@@ -367,8 +370,7 @@ class Consensus:
         """
         current_round = self.store.get_round()
         current_state = self.store.get_state()
-        print("Current round:", current_round)
-        print("Current state:", current_state)
+        log.info(f'Current round: {current_round}, current state: {current_state}')
         # FIXME: After round change, check if any upon conditions are already satisfied in the store
 
         if current_state == "DECIDED":
@@ -382,10 +384,7 @@ class Consensus:
             # Validate the message, then add to the store
             is_new_message = self.receive_message(message, current_round)
         except AssertionError as e:
-            print(">>>-------------------------------")
-            print("Message was invalid. Error:", e)
-            print("Message:", message)
-            print("<<<-------------------------------")
+            log.error('Message was invalid', exc_info=True)
             return "MESSAGE_REJECTED"
 
         if not is_new_message:
@@ -403,8 +402,7 @@ class Consensus:
                 sender = self.node_identity
                 prepare_message = ConsensusMessage("PREPARE", current_round, data, sender)
                 broadcast_message(prepare_message, self.store.get_peers())
-            print("State set to PREPARED")
-            print("----------------------------------")
+            log.info(f'State set to PREPARED. PRE_PREPARE was: {message}')
             return "START_TIMER"
         #-----------------------------------------------------------------------
         elif message.type == "PREPARE":
@@ -423,12 +421,7 @@ class Consensus:
             for value in supporting_weights:
                 if supporting_weights[value] == max_supporting_weight:
                     best_value = value
-            print("prepare_msgs:", [msg.to_dict() for msg in prepare_msgs])
-            print("supporting_weights:", supporting_weights)
-            print("max_supporting_weight:", max_supporting_weight)
-            print("best_value:", best_value)
             if max_supporting_weight >= self.byz_quorum:
-                print("max_supporting_weight >= self.byz_quorum")
                 self.store.set_prepared_round(current_round)
                 self.store.set_prepared_value(best_value)
                 quorum_messages = []
@@ -442,9 +435,7 @@ class Consensus:
                     sender = self.node_identity
                     commit_message = ConsensusMessage("COMMIT", current_round, data, sender)
                     broadcast_message(commit_message, self.store.get_peers())
-                print("State set to COMITTED")
-                print("PREPARE_QUORUM was:", [msg.to_string() for msg in quorum_messages])
-                print("----------------------------------")
+                log.info(f'State set to COMITTED. PREPARE_QUORUM was: {[msg.to_string() for msg in quorum_messages]}')
             return "NO_CHANGE"
         #-----------------------------------------------------------------------
         elif message.type == "COMMIT":
@@ -471,9 +462,7 @@ class Consensus:
                         quorum_messages.append(msg)
                 self.store.add_quorum_messages(current_round, "COMMIT_QUORUM", quorum_messages)
                 self.store.set_state("DECIDED")
-                print("State set to DECIDED")
-                print("COMMIT_QUORUM was:", [msg.to_string() for msg in quorum_messages])
-                print("----------------------------------")
+                log.info(f'State set to DECIDED. COMMIT_QUORUM was: {[msg.to_string() for msg in quorum_messages]}')
                 return "STOP_TIMER"
             return "NO_CHANGE"
         #-----------------------------------------------------------------------
@@ -491,17 +480,13 @@ class Consensus:
                                     rc_quorum.append(rc_msg)
                                     seen_node[rc_msg.sender] = True
                                     supporting_weight += self.nodes[rc_msg.sender].weight
-                print("rc_quorum:", [msg.to_string() for msg in rc_quorum])
-                print("supporting_weight:", supporting_weight)
                 if supporting_weight >= self.rc_threshold:
                     rc_quorum_round_nums = [rc_msg.round for rc_msg in rc_quorum]
                     new_round_num = min(rc_quorum_round_nums)
                     self.store.set_round(new_round_num)
                     self.store.set_state("ROUND_CHANGED")
                     self.broadcast_round_change()
-                    print("State set to ROUND_CHANGED")
-                    print("rc_quorum was:", [msg.to_string() for msg in rc_quorum])
-                    print("----------------------------------")
+                    log.info(f'State set to ROUND_CHANGED. rc_quorum was: {[msg.to_string() for msg in rc_quorum]}')
                     return "START_TIMER"
             elif message.round == current_round and self.store.get_leader() == self.node_identity:
                 rc_quorum = self.store.get_messages(current_round, "ROUND_CHANGE")
@@ -514,5 +499,5 @@ class Consensus:
                     return "START_TIMER"
             return "NO_CHANGE"
         #-----------------------------------------------------------------------
-        print("Unknown message type:", str(message.type))
+        log.error(f'Unknown message type: {message.type}')
         return "MESSAGE_REJECTED"
