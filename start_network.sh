@@ -39,7 +39,7 @@ do
     --start_time $START_TIME > /dev/null &
 done
 
-trap "echo 'Interrupted. Killing all other IBFT processes.'; pgrep -f 'python3 consensus-worker.py|python3 flask-server.py' | xargs kill" INT
+trap "echo 'Interrupted. Killing all other IBFT processes.'; pkill -f 'python3 consensus-worker.py|python3 flask-server.py'" INT
 
 echo python3 flask-server.py \
 --node_identity 0 \

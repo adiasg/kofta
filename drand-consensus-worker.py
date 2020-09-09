@@ -5,7 +5,8 @@ import pika, sys
 import json
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
-from consensus import ConsensusNode, ConsensusMessage, ConsensusStore, Consensus
+from consensus import ConsensusNode, ConsensusMessage, ConsensusStore
+from drand_consensus import DrandConsensus
 import logging
 
 # python3 consensus-worker.py --nodes localhost:9000 --node_identity 0 --byz_quorum 1 --round_duration 3 --start_time $(( $(date '+%s') + 2 ))
@@ -47,17 +48,33 @@ parser.add_argument(
     default = math.ceil(datetime.datetime.timestamp(datetime.datetime.now()))+2,
     help = "Start time (as UNIX timestamp) for the protocol"
 )
+parser.add_argument(
+    "--drand_api",
+    type = str,
+    default = 'https://drand.cloudflare.com/public',
+    help = "drand API to fetch drand values"
+)
+parser.add_argument(
+    "--drand_round",
+    type = int,
+    default = 1,
+    help = "Forms consensus on the drand value from this round"
+)
 args = parser.parse_args()
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter(f'%(asctime)s - %(name)-9s - %(levelname)8s - Node:{args.node_identity} - %(message)s')
+formatter = logging.Formatter(f'%(asctime)s - %(name)-15s - %(levelname)8s - Node:{args.node_identity} - %(message)s')
 ch.setFormatter(formatter)
 log.addHandler(ch)
 
 consensus_log = logging.getLogger('consensus')
+consensus_log.setLevel(logging.INFO)
+consensus_log.addHandler(ch)
+
+consensus_log = logging.getLogger('drand_consensus')
 consensus_log.setLevel(logging.INFO)
 consensus_log.addHandler(ch)
 
@@ -76,7 +93,7 @@ if __name__ == '__main__':
         node_identity = None
 
     store = ConsensusStore(node_identity, peers)
-    consensus_instance = Consensus(nodes, byz_quorum, rc_threshold, round_duration, start_time, store, node_identity=node_identity)
+    consensus_instance = DrandConsensus(nodes, byz_quorum, rc_threshold, round_duration, start_time, store, node_identity=node_identity, drand_api=args.drand_api, drand_round=args.drand_round)
 
     connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
     channel = connection.channel()
