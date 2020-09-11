@@ -29,7 +29,7 @@ do
   --port $(( $PORT_START_ADDR + $NODE_ID ))
   python3 flask-server.py \
   --node_identity $NODE_ID \
-  --port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
+  --port $(( $PORT_START_ADDR + $NODE_ID )) &
   echo python3 lighthouse-consensus-worker.py \
     --nodes $NODES \
     --node_identity $NODE_ID \
@@ -47,7 +47,7 @@ do
     --round_duration $ROUND_DURATION \
     --start_time $START_TIME \
     --lighthouse_api $LIGHTHOUSE_API \
-    --eth2_slot $ETH2_SLOT > /dev/null &
+    --eth2_slot $ETH2_SLOT &
 done
 
 echo python3 flask-server.py \
@@ -55,7 +55,7 @@ echo python3 flask-server.py \
 --port $(( $PORT_START_ADDR + 0 ))
 python3 flask-server.py \
 --node_identity 0 \
---port $(( $PORT_START_ADDR + 0 )) > /dev/null &
+--port $(( $PORT_START_ADDR + 0 )) &
 echo python3 lighthouse-consensus-worker.py \
   --nodes $NODES \
   --node_identity 0 \

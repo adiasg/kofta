@@ -27,7 +27,7 @@ echo python3 flask-server.py \
 --port $(( $PORT_START_ADDR + $NODE_ID ))
 python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
+--port $(( $PORT_START_ADDR + $NODE_ID )) &
 echo python3 drand-consensus-worker.py \
   --nodes $NODES \
   --node_identity $NODE_ID \
@@ -45,7 +45,7 @@ python3 drand-consensus-worker.py \
   --round_duration $ROUND_DURATION \
   --start_time $START_TIME \
   --drand_api https://api.drand.sh/public \
-  --drand_round $DRAND_ROUND > /dev/null &
+  --drand_round $DRAND_ROUND &
 #---------------------------------------------
 NODE_ID=2
 echo python3 flask-server.py \
@@ -53,7 +53,7 @@ echo python3 flask-server.py \
 --port $(( $PORT_START_ADDR + $NODE_ID ))
 python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
+--port $(( $PORT_START_ADDR + $NODE_ID )) &
 echo python3 drand-consensus-worker.py \
   --nodes $NODES \
   --node_identity $NODE_ID \
@@ -71,7 +71,7 @@ python3 drand-consensus-worker.py \
   --round_duration $ROUND_DURATION \
   --start_time $START_TIME \
   --drand_api https://api2.drand.sh/public \
-  --drand_round $DRAND_ROUND > /dev/null &
+  --drand_round $DRAND_ROUND &
 #---------------------------------------------
 NODE_ID=3
 echo python3 flask-server.py \
@@ -79,7 +79,7 @@ echo python3 flask-server.py \
 --port $(( $PORT_START_ADDR + $NODE_ID ))
 python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
+--port $(( $PORT_START_ADDR + $NODE_ID )) &
 echo python3 drand-consensus-worker.py \
   --nodes $NODES \
   --node_identity $NODE_ID \
@@ -97,7 +97,7 @@ python3 drand-consensus-worker.py \
   --round_duration $ROUND_DURATION \
   --start_time $START_TIME \
   --drand_api https://api3.drand.sh/public \
-  --drand_round $DRAND_ROUND > /dev/null &
+  --drand_round $DRAND_ROUND &
 #---------------------------------------------
 NODE_ID=0
 echo python3 flask-server.py \
@@ -105,7 +105,7 @@ echo python3 flask-server.py \
 --port $(( $PORT_START_ADDR + $NODE_ID ))
 python3 flask-server.py \
 --node_identity $NODE_ID \
---port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
+--port $(( $PORT_START_ADDR + $NODE_ID )) &
 echo python3 drand-consensus-worker.py \
   --nodes $NODES \
   --node_identity $NODE_ID \

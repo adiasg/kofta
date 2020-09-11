@@ -25,7 +25,7 @@ do
   --port $(( $PORT_START_ADDR + $NODE_ID ))
   python3 flask-server.py \
   --node_identity $NODE_ID \
-  --port $(( $PORT_START_ADDR + $NODE_ID )) > /dev/null &
+  --port $(( $PORT_START_ADDR + $NODE_ID )) &
   echo python3 consensus-worker.py \
     --nodes $NODES \
     --node_identity $NODE_ID \
@@ -39,7 +39,7 @@ do
     --byz_quorum $BYZ_QUORUM \
     --rc_threshold $RC_THRESHOLD \
     --round_duration $ROUND_DURATION \
-    --start_time $START_TIME > /dev/null &
+    --start_time $START_TIME &
 done
 
 echo python3 flask-server.py \
@@ -47,7 +47,7 @@ echo python3 flask-server.py \
 --port $(( $PORT_START_ADDR + 0 ))
 python3 flask-server.py \
 --node_identity 0 \
---port $(( $PORT_START_ADDR + 0 )) > /dev/null &
+--port $(( $PORT_START_ADDR + 0 )) &
 echo python3 consensus-worker.py \
   --nodes $NODES \
   --node_identity 0 \

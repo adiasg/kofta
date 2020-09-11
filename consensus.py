@@ -240,9 +240,8 @@ class Consensus:
         assert message.type == "PRE_PREPARE", "Incorrect message type for PRE_PREPARE message"
         assert message.verify_signature(), "Incorrect siganture for PRE_PREPARE message"
         assert self.validate_message_data(message.data), "Invalid data for PRE_PREPARE message"
-        if message.round > 1:
-            justification = message.data['justification']
-            assert self.justify_round_change(justification, message.round)
+        # FIXME: Shift all this into justify_pre_prepare. Implement that correctly.
+        assert self.justify_pre_prepare(message, round), "justify_pre_prepare failed for PRE_PREPARE message"
         return True
 
 
@@ -281,9 +280,10 @@ class Consensus:
             prepare_message_quorum = 0
             seen_node = [False for node_id in self.nodes]
             for prepare_message in justification:
-                assert self.validate_prepare_message(prepare_message, message.data['prepared_round']), "validate_prepare_message failed for message in justification of ROUND_CHANGE message"
-                assert prepare_message.value == message.data['prepared_value'], "Value of prepared message in justification is not prepared value in ROUND_CHANGE message"
                 assert not seen_node[prepare_message.sender], "Second message from same sender in the justification of ROUND_CHANGE message"
+                assert prepare_message.value == message.data['prepared_value'], "Value of prepared message in justification is not prepared value in ROUND_CHANGE message"
+                assert self.validate_prepare_message(prepare_message, message.data['prepared_round']), "validate_prepare_message failed for message in justification of ROUND_CHANGE message"
+                seen_node[prepare_message.sender] = True
                 prepare_message_quorum += self.nodes[prepare_message.sender].weight
             assert prepare_message_quorum >= self.byz_quorum, "Quorum weight not met by the justification of ROUND_CHANGE message"
         return True
@@ -292,56 +292,41 @@ class Consensus:
         rc_message_quorum = 0
         seen_node = [False for node_id in self.nodes]
         for rc_message in q_rc:
-            assert self.validate_round_change_message(rc_message, round), "ROUND_CHANGE message in quorum is not valid"
             assert not seen_node[rc_message.sender], "Second message from same sender in a quorum of ROUND_CHANGE messages"
+            assert self.validate_round_change_message(rc_message, round), "ROUND_CHANGE message in quorum is not valid"
+            seen_node[rc_message.sender] = True
             rc_message_quorum += self.nodes[rc_message.sender].weight
         if rc_message_quorum < self.byz_quorum:
             return False
 
-        # The remaining logic is already covered in validate_round_change_message of highest_pr_rc_message
-        """
-        if all(rc_message.data['prepared_round'] == 0 and rc_message.data['prepared_value'] is None for rc_message in q_rc):
-            return True
-
-        highest_pr_rc_message = max(q_rc, key=lambda rc_msg: rc_msg.data['prepared_round'])
-        justification = [ConsensusMessage.from_dict(p_msg) for p_msg in highest_pr_rc_message.data['justification']]
-        prepare_message_quorum = 0
-        seen_node = [False for node_id in self.nodes]
-        for prepare_message in justification:
-            assert self.validate_prepare_message(prepare_message, message.data['prepared_round']), "validate_prepare_message failed for message in justification of ROUND_CHANGE message"
-            assert prepare_message.value == message.data['prepared_value'], "Value of prepared message in justification is not prepared value in ROUND_CHANGE message"
-            assert not seen_node[prepare_message.sender], "Second message from same sender in justification of ROUND_CHANGE message"
-            prepare_message_quorum += self.nodes[prepare_message.sender].weight
-        assert prepare_message_quorum >= self.byz_quorum, "Quorum weight not met by justification of ROUND_CHANGE message"
-        return True
-        """
-
+        # The remaining logic is already covered in validate_round_change_message of the ROUND_CHANGE message in `q_rc` with highest prepared round
         return True
 
     def justify_pre_prepare(self, message, round):
-        self.validate_pre_prepare_message(message, round)
-        # The remaining logic is already covered in validate_pre_prepare_message of message
-        """
-        if round == 1:
-            return True
+        if message.round > 1:
+            justification = message.data['justification']
+            rc_message_quorum = 0
+            rc_seen_node = [False for node_id in self.nodes]
+            for rc_message in justification:
+                # validate_round_change_message will also check that the rc_message is from round `message.round`
+                assert not rc_seen_node[rc_message.sender], "Second ROUND_CHANGE message from same sender in the justification of PRE_PREPARE message"
+                assert self.validate_round_change_message(rc_message, message.round), "ROUND_CHANGE message in justification of PRE_PREPARE is not valid"
+                rc_seen_node[rc_message.sender] = True
+                rc_message_quorum += self.nodes[rc_message.sender].weight
+            assert rc_message_quorum >= self.byz_quorum, "Justification of PRE_PREPARE message does not satisfy the Byazntine threshold"
 
-        pp_justification = [ConsensusMessage.from_dict(p_msg) for p_msg in message.data['justification']]
-        if all(rc_message.data['prepared_round'] == 0 and rc_message.data['prepared_value'] is None for rc_message in pp_justification):
-            return True
-
-        highest_pr_rc_message = max(pp_justification, key=lambda rc_msg: rc_msg.data['prepared_round'])
-        justification = [ConsensusMessage.from_dict(p_msg) for p_msg in highest_pr_rc_message.data['justification']]
-        prepare_message_quorum = 0
-        seen_node = [False for node_id in self.nodes]
-        for prepare_message in justification:
-            assert self.validate_prepare_message(prepare_message, message.data['prepared_round']), "validate_prepare_message failed for message in justification of ROUND_CHANGE message"
-            assert prepare_message.value == message.data['prepared_value'], "Value of prepared message in justification is not prepared value in ROUND_CHANGE message"
-            assert not seen_node[prepare_message.sender], "Second message from same sender in justification of ROUND_CHANGE message"
-            prepare_message_quorum += self.nodes[prepare_message.sender].weight
-        assert prepare_message_quorum >= self.byz_quorum, "Quorum weight not met by justification of ROUND_CHANGE message"
-        return True
-        """
-
+            highest_pr_rc_message = max(justification, key=lambda rc_msg: rc_msg.data['prepared_round'])
+            if highest_pr_rc_message.data['prepared_round'] > 0 or highest_pr_rc_message.data['prepared_value'] is not None:
+                # TODO: The two conditions in the IF statement should both happen together, or none at all
+                p_message_quorum = 0
+                p_seen_node = [False for node_id in self.nodes]
+                for p_msg in highest_pr_rc_message.data['justification']:
+                    assert not p_seen_node[p_msg.sender], "Second PREPARE message from same sender in the justification of highest_pr_rc_message"
+                    assert p_msg.data['value'] == highest_pr_rc_message.data['value'], "PREPARE message in justification of highest_pr_rc_message does not have highest_pr_rc_message.data['value']"
+                    assert self.validate_prepare_message(p_msg, highest_pr_rc_message.round), "PREPARE message in justification of highest_pr_rc_message is not from highest_pr_rc_message.round"
+                    p_seen_node[p_msg.sender] = True
+                    p_message_quorum += self.nodes[p_msg.sender].weight
+                assert p_message_quorum >= self.byz_quorum, "Justification of highest_pr_rc_message does not meet quorum weight"
         return True
 
     def receive_message(self, message, round):
