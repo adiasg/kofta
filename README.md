@@ -23,8 +23,6 @@ This implementation is based on [the Istanbul BFT Consensus Algorithm](https://a
     - `BYZ_QUORUM` is the number of nodes corresponding to a Byzantine quorum
     - `RC_THRESHOLD` is the number of nodes corresponding to a round change threshold
 
-    Only the output from the leader node's process will be displayed in the current terminal, and all other node's processes will run silently in the background. To exit, press `CTRL+C`, which will kill all spawned IBFT processes.
-
 
 - **drand consensus**
   - The IBFT protocol will form consensus over drand randomness for a given drand round number
